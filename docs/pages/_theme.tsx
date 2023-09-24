@@ -11,21 +11,16 @@ const theme: Theme = (props) => {
   const { loadedData, loadState } = props
 
   const DocTheme = createTheme({
-    logo: <div style={{ fontSize: '20px' }}>pkg-name</div>,
+    logo: <div style={{ fontSize: '20px' }}>react-dx</div>,
     topNavs: [
       {
-        label: 'Components',
-        path: '/components',
-        activeIfMatch: '/components',
+        label: 'Helpers',
+        path: '/helpers',
+        activeIfMatch: '/helpers',
       },
       {
-        label: 'Hooks',
-        path: '/hooks',
-        activeIfMatch: '/hooks',
-      },
-      {
-        label: 'pkg-name',
-        href: 'https://github.com/yunsii/starter-vite-react-library',
+        label: 'react-dx',
+        href: 'https://github.com/yunsii/react-dx',
       },
     ],
     sideNavs: (ctx) => {

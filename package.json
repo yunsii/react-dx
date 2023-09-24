@@ -1,5 +1,5 @@
 {
-  "name": "pkg-name",
+  "name": "react-dx",
   "description": "",
   "version": "0.0.0",
   "author": "Yuns <yuns.xie@qq.com>",
@@ -11,17 +11,21 @@
   "files": [
     "dist"
   ],
-  "keywords": [],
+  "keywords": [
+    "react",
+    "react-components",
+    "react-utils"
+  ],
   "funding": [
     "https://opencollective.com/yuns",
     "https://afdian.net/@yunslove"
   ],
-  "homepage": "https://github.com/yunsii/pkg-name#readme",
+  "homepage": "https://github.com/yunsii/react-dx#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yunsii/pkg-name"
+    "url": "https://github.com/yunsii/react-dx"
   },
-  "bugs": "https://github.com/yunsii/pkg-name/issues",
+  "bugs": "https://github.com/yunsii/react-dx/issues",
   "scripts": {
     "dev": "vite --config vite.docs.config.ts",
     "build:docs": "tsc && vite build --config vite.docs.config.ts",
@@ -96,5 +100,8 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "access": "public"
+  },
+  "dependencies": {
+    "rc-util": "^5.37.0"
   }
 }

@@ -9,6 +9,11 @@ export function usePageProps<PageProps = Record<string, any>>() {
   return context as PageProps
 }
 
+export interface WithLayoutsOptions {
+  /** page properties to hoist */
+  propertiesHoist?: string[]
+}
+
 /**
  * Compose page with various layouts
  *
@@ -31,7 +36,10 @@ export function withLayouts<PageProps = Record<string, any>>(
   Layouts: React.ComponentType<{
     children: React.ReactNode
   }>[],
+  options: WithLayoutsOptions = {},
 ) {
+  const { propertiesHoist = [] } = options
+
   const WithLayoutsPage: React.FC<PageProps> = (pageProps) => {
     let children = <Page {...(pageProps as any)} />
 
@@ -50,6 +58,11 @@ export function withLayouts<PageProps = Record<string, any>>(
   }
 
   WithLayoutsPage.displayName = `WithLayout(${getDisplayName(Page)})`
+  propertiesHoist.forEach((item) => {
+    if (item in Page) {
+      ;(WithLayoutsPage as any)[item] = (Page as any)[item]
+    }
+  })
 
   return WithLayoutsPage
 }

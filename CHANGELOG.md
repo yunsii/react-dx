@@ -1,5 +1,11 @@
 # react-dx
 
+## 0.0.5
+
+### Patch Changes
+
+- ♻️ chore: drop rc-util
+
 ## 0.0.4
 
 ### Patch Changes

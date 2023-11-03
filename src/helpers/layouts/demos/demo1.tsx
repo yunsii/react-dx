@@ -1,9 +1,29 @@
 import React, { useState } from 'react'
 
-import { withLayouts } from '..'
+import { usePageProps, withLayouts } from '..'
 
-const InternalPage: React.FC = () => {
-  return <div className='bg-gray-500 p-2'>Page</div>
+export interface PageProps {
+  defaultPage: number
+}
+
+const InternalPage: React.FC<PageProps> = (props) => {
+  const { defaultPage = 0 } = props
+
+  const [count, setCount] = useState(defaultPage)
+
+  return (
+    <div className='bg-gray-500 p-2'>
+      Page: {count}
+      <button
+        className='bg-orange-500 rounded px-1 ml-1'
+        onClick={() => {
+          setCount(count + 1)
+        }}
+      >
+        +1
+      </button>
+    </div>
+  )
 }
 
 const Layout1: React.FC<React.PropsWithChildren> = (props) => {
@@ -20,6 +40,9 @@ const Layout1: React.FC<React.PropsWithChildren> = (props) => {
 
 const Layout2: React.FC<React.PropsWithChildren> = (props) => {
   const { children } = props
+  const pageProps = usePageProps<PageProps>()
+  // eslint-disable-next-line no-console
+  console.log('🚀 ~ file: demo1.tsx:44 ~ pageProps:', pageProps)
 
   return (
     <div className='bg-sky-500 p-2'>
@@ -67,10 +90,20 @@ const Page = withLayouts(InternalPage, [
 ])
 
 export default function Demo1() {
+  const [defaultPage, setDefaultPage] = useState(10)
+
   return (
     <div>
       <h2>Nested Layouts</h2>
-      <Page />
+      <button
+        className='bg-orange-500 rounded px-1'
+        onClick={() => {
+          setDefaultPage(defaultPage + 1)
+        }}
+      >
+        defaultPage: {defaultPage}
+      </button>
+      <Page defaultPage={defaultPage} />
     </div>
   )
 }

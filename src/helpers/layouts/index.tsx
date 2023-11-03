@@ -1,6 +1,13 @@
-import React from 'react'
+import React, { useContext } from 'react'
 
 import { getDisplayName } from '../react-nodes'
+
+const PagePropsContext = React.createContext<any>({})
+
+export function usePageProps<PageProps = Record<string, any>>() {
+  const context = useContext(PagePropsContext)
+  return context as PageProps
+}
 
 /**
  * Compose page with various layouts
@@ -19,20 +26,25 @@ import { getDisplayName } from '../react-nodes'
  * </Layout2>
  * ```
  */
-export function withLayouts<PageProps = object>(
+export function withLayouts<PageProps = Record<string, any>>(
   Page: React.ComponentType<PageProps>,
   Layouts: React.ComponentType<{
     children: React.ReactNode
-    _pageProps: PageProps
   }>[],
 ) {
   const WithLayoutsPage: React.FC<PageProps> = (pageProps) => {
     let children = <Page {...(pageProps as any)} />
 
-    for (let index = Layouts.length - 1; index >= 0; index--) {
+    for (let index = 0; index < Layouts.length; index++) {
       const Layout = Layouts[index]
-      children = <Layout _pageProps={pageProps}>{children}</Layout>
+      children = <Layout>{children}</Layout>
     }
+
+    children = (
+      <PagePropsContext.Provider value={pageProps}>
+        {children}
+      </PagePropsContext.Provider>
+    )
 
     return children
   }

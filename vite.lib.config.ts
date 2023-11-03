@@ -23,7 +23,11 @@ const regexpsOfPackages = externalPackages.map(
 
 // https://vitejs.dev/config/
 export default mergeConfig(baseConfig, {
-  plugins: [dts()],
+  plugins: [
+    dts({
+      exclude: '**/demos/**/*.tsx',
+    }),
+  ],
   build: {
     minify: false,
     lib: {
@@ -37,7 +41,7 @@ export default mergeConfig(baseConfig, {
         dir: 'dist',
         preserveModules: true,
         preserveModulesRoot: 'src',
-        entryFileNames: '[name].mjs',
+        entryFileNames: '[name].js',
       },
       external: [...regexpsOfPackages, /^node:.*$/],
     },

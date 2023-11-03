@@ -103,5 +103,6 @@
   },
   "dependencies": {
     "rc-util": "^5.37.0"
-  }
+  },
+  "packageManager": "pnpm@8.10.2"
 }

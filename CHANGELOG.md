@@ -1,5 +1,11 @@
 # react-dx
 
+## 0.0.4
+
+### Patch Changes
+
+- 📦 refactor: pure esm package
+
 ## 0.0.3
 
 ### Patch Changes

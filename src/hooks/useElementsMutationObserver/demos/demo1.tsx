@@ -8,16 +8,17 @@ export default function Demo1() {
   const [newContainerCount, setNewContainerCount] = useState(0)
 
   useElementsMutationObserver('[data-testid="container"]', {
-    createObserverOptions: {
-      onCreate(element) {
-        console.log('🚀 ~ file: demo1.tsx:11 ~ onCreate ~ element:', element)
-      },
-      onMutate(element, mutations) {
-        console.log('🚀 ~ file: demo1.tsx:15 ~ onMutate ~ element, mutations:', element, mutations)
-      },
-      onEffect(element, mutations) {
-        console.log('🚀 ~ file: demo1.tsx:18 ~ onEffect ~ element, mutations:', element, mutations)
-      },
+    observeOptions: {
+      characterData: true,
+    },
+    onCreate(element) {
+      console.log('🚀 ~ file: demo1.tsx:11 ~ onCreate ~ element:', element)
+    },
+    onMutate(element, mutations) {
+      console.log('🚀 ~ file: demo1.tsx:15 ~ onMutate ~ element, mutations:', element, mutations)
+    },
+    onEffect(element, mutations) {
+      console.log('🚀 ~ file: demo1.tsx:18 ~ onEffect ~ element, mutations:', element, mutations)
     },
   })
 
@@ -47,6 +48,10 @@ export default function Demo1() {
             <div key={index} data-testid='container' className='bg-cyan-200'>
               new container
               {index + 1}
+              <div>
+                {/* Un-controlled input can not trigger mutation observer */}
+                <input className='border' />
+              </div>
             </div>
           )
         })}

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { omit } from 'lodash-es'
 
 import type { CreateElementMutationObserverOptions } from '@/helpers/dom/mutation-observer'
 
@@ -7,22 +8,19 @@ import { createElementMutationObserver } from '@/helpers/dom/mutation-observer'
 export interface UseElementsMutationObserverPostElementOptions<
   E extends Element = Element,
   PE extends Element = Element,
+> extends Omit<
+CreateElementMutationObserverOptions<E>,
+'element'
 > {
   postElement: (element: E) => PE
-  createObserverOptions: Omit<
-    CreateElementMutationObserverOptions<E>,
-    'element'
-  >
 }
 
 export interface UseElementsMutationObserverBaseOptions<
   E extends Element = Element,
-> {
-  createObserverOptions: Omit<
-    CreateElementMutationObserverOptions<E>,
-    'element'
-  >
-}
+> extends Omit<
+CreateElementMutationObserverOptions<E>,
+'element'
+> {}
 
 export function useElementsMutationObserver<
   E extends Element = Element,
@@ -35,12 +33,7 @@ export function useElementsMutationObserver<E extends Element = Element>(
   selectors: string,
   options: UseElementsMutationObserverBaseOptions<E>,
 ): void
-export function useElementsMutationObserver(selectors: string, options: any) {
-  const {
-    postElement,
-    createObserverOptions,
-  } = options
-
+export function useElementsMutationObserver(selectors: string, options: UseElementsMutationObserverBaseOptions | UseElementsMutationObserverPostElementOptions) {
   const createdNodesRef = useRef<Node[]>([])
 
   useEffect(() => {
@@ -48,7 +41,7 @@ export function useElementsMutationObserver(selectors: string, options: any) {
       const targetElements = document.querySelectorAll(selectors)
 
       targetElements.forEach((element) => {
-        const targetElement = postElement ? postElement(element) : element
+        const targetElement = 'postElement' in options ? options.postElement(element) : element
 
         if (createdNodesRef.current.includes(targetElement)) {
           return
@@ -61,7 +54,7 @@ export function useElementsMutationObserver(selectors: string, options: any) {
         })
 
         createElementMutationObserver({
-          ...createObserverOptions,
+          ...omit(options, 'postElement'),
           element: targetElement,
         })
       })

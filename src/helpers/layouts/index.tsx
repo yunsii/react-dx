@@ -2,7 +2,7 @@ import React, { useContext } from 'react'
 
 import { getDisplayName } from '../react-nodes'
 
-const PagePropsContext = React.createContext<any>({})
+import { PagePropsContext } from './context'
 
 export function usePageProps<PageProps = Record<string, any>>() {
   const context = useContext(PagePropsContext)

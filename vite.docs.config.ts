@@ -1,4 +1,4 @@
-import path from 'path'
+import path from 'node:path'
 
 import { mergeConfig } from 'vite'
 import pages, { DefaultPageStrategy } from 'vite-plugin-react-pages'

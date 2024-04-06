@@ -8,8 +8,8 @@ import baseConfig from './vite.base.config'
 
 import type { UserConfig } from 'vite'
 
-const { peerDependencies = {}, dependencies = {} } =
-  fse.readJsonSync('./package.json')
+const { peerDependencies = {}, dependencies = {} }
+  = fse.readJsonSync('./package.json')
 
 const externalPackages = Array.from(
   new Set([...Object.keys(peerDependencies), ...Object.keys(dependencies)]),

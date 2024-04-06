@@ -1,6 +1,6 @@
 import React from 'react'
 
-export const getDisplayName = (node: React.ComponentType<any>) => {
+export function getDisplayName(node: React.ComponentType<any>) {
   return node.displayName || node.name || 'Component'
 }
 
@@ -17,8 +17,8 @@ export function joinReactNodes(
             React.isValidElement(item)
               ? item.key
               : ['string', 'number'].includes(typeof item)
-              ? `${item}`
-              : index
+                  ? `${item}`
+                  : index
           }
         >
           {item}

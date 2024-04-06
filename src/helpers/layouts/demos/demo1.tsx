@@ -13,7 +13,9 @@ const InternalPage: React.FC<PageProps> = (props) => {
 
   return (
     <div className='bg-gray-500 p-2'>
-      Page: {count}
+      Page:
+      {' '}
+      {count}
       <button
         className='bg-orange-500 rounded px-1 ml-1'
         onClick={() => {
@@ -79,7 +81,9 @@ const Page = withLayouts(InternalPage, [
               setCount(count + 1)
             }}
           >
-            count: {count}
+            count:
+            {' '}
+            {count}
           </button>
         </div>
         {children}
@@ -101,7 +105,9 @@ export default function Demo1() {
           setDefaultPage(defaultPage + 1)
         }}
       >
-        defaultPage: {defaultPage}
+        defaultPage:
+        {' '}
+        {defaultPage}
       </button>
       <Page defaultPage={defaultPage} />
     </div>

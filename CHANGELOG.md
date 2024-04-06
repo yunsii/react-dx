@@ -1,5 +1,11 @@
 # react-dx
 
+## 0.1.0
+
+### Minor Changes
+
+- New hook useElementsMutationObserver
+
 ## 0.0.5
 
 ### Patch Changes

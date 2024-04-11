@@ -5,8 +5,8 @@ export function getDisplayName(node: React.ComponentType<any>) {
 }
 
 export function joinReactNodes(
-  nodes: React.ReactNode[],
-  separator: React.ReactNode,
+  nodes: (React.ReactNode | JSX.Element)[],
+  separator: React.ReactNode | JSX.Element,
 ) {
   return nodes
     .filter((item) => Boolean(item))

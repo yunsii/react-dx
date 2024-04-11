@@ -1,5 +1,11 @@
 # react-dx
 
+## 0.1.2
+
+### Patch Changes
+
+- 🐛 fix: joinReactNodes types
+
 ## 0.1.1
 
 ### Patch Changes

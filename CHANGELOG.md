@@ -1,5 +1,11 @@
 # react-dx
 
+## 0.1.3
+
+### Patch Changes
+
+- 🐛 fix: check callbacks
+
 ## 0.1.2
 
 ### Patch Changes

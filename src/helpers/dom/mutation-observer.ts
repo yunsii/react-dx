@@ -35,7 +35,7 @@ export function createElementMutationObserver<T extends Element = Element>(
     return
   }
 
-  if ([onMutate, onUnmount, onEffect, onUnmount].every((item) => !item)) {
+  if ([onCreate, onMutate, onEffect, onUnmount].every((item) => !item)) {
     return
   }
 

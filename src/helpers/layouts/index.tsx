@@ -1,13 +1,10 @@
-import React, { useContext } from 'react'
+import React, { useMemo } from 'react'
 
 import { getDisplayName } from '../react-nodes'
+import { AllPagePropsContext } from './context'
+import { useAllPageProps } from './hooks'
 
-import { PagePropsContext } from './context'
-
-export function usePageProps<PageProps = Record<string, any>>() {
-  const context = useContext(PagePropsContext)
-  return context as PageProps
-}
+import type { AllPagePropsValue } from './context'
 
 export interface WithLayoutsOptions {
   /** page properties to hoist */
@@ -39,25 +36,43 @@ export function withLayouts<PageProps = Record<string, any>>(
   options: WithLayoutsOptions = {},
 ) {
   const { propertiesHoist = [] } = options
+  const pageDisplayName = getDisplayName(Page)
 
   const WithLayoutsPage: React.FC<PageProps> = (pageProps) => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const allPageProps = useAllPageProps()
+
     let children = <Page {...(pageProps as any)} />
 
     for (let index = 0; index < Layouts.length; index++) {
       const Layout = Layouts[index]
+
+      if (!Layout.displayName) {
+        Layout.displayName = `Layout${index + 1}_${pageDisplayName}`
+      }
+
       children = <Layout>{children}</Layout>
     }
 
+    const pagePropsValue = useMemo(() => {
+      const state: AllPagePropsValue = new Map()
+      allPageProps.forEach((value, key) => {
+        state.set(key, value)
+      })
+      state.set(Page, pageProps as Record<string, any>)
+      return state
+    }, [allPageProps, pageProps])
+
     children = (
-      <PagePropsContext.Provider value={pageProps}>
+      <AllPagePropsContext.Provider value={pagePropsValue}>
         {children}
-      </PagePropsContext.Provider>
+      </AllPagePropsContext.Provider>
     )
 
     return children
   }
 
-  WithLayoutsPage.displayName = `WithLayout(${getDisplayName(Page)})`
+  WithLayoutsPage.displayName = `WithLayouts(${pageDisplayName})`
   propertiesHoist.forEach((item) => {
     if (item in Page) {
       ;(WithLayoutsPage as any)[item] = (Page as any)[item]

@@ -1,5 +1,11 @@
 # react-dx
 
+## 0.2.0
+
+### Minor Changes
+
+- ✨ feat: support to get specific page props
+
 ## 0.1.3
 
 ### Patch Changes

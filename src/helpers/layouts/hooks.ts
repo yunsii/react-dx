@@ -13,6 +13,6 @@ export function usePageProps<PageProps = Record<string, any>>(component?: React.
     return allPageProps.get(component) as PageProps
   }
   // keys order: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map#objects_vs._maps
-  const mapKeys = allPageProps.keys().toArray()
+  const mapKeys = Array.from(allPageProps.keys())
   return allPageProps.get(mapKeys[mapKeys.length - 1]) as PageProps
 }

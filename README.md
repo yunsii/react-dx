@@ -5,7 +5,12 @@
 ## Usage
 
 ```tsx
-import { joinReactNodes, withLayouts } from 'react-dx'
+import {
+  createElementMutationObserver,
+  joinReactNodes,
+  useElementsMutationObserver,
+  withLayouts
+} from 'react-dx'
 ```
 
 ## Build & Publish

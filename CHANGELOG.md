@@ -1,5 +1,11 @@
 # react-dx
 
+## 0.2.2
+
+### Patch Changes
+
+- 🐛 fix: polish with react strict mode
+
 ## 0.2.1
 
 ### Patch Changes

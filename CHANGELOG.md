@@ -1,5 +1,11 @@
 # react-dx
 
+## 0.2.3
+
+### Patch Changes
+
+- ✨ feat: improve type safety for usePageProps hook
+
 ## 0.2.2
 
 ### Patch Changes

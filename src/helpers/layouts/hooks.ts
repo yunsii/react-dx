@@ -7,7 +7,7 @@ export function useAllPageProps() {
   return context
 }
 
-export function usePageProps<PageProps = Record<string, any>>(component?: React.ComponentType<PageProps>) {
+export function usePageProps<PageProps>(component?: React.ComponentType<PageProps>) {
   const allPageProps = useAllPageProps()
   if (component) {
     return allPageProps.get(component) as PageProps

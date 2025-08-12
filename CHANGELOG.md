@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.0.1
+
+### Patch Changes
+
+- 🐛 fix: observeOptions usage and type assert
+
 ## 1.0.0
 
 ### Major Changes

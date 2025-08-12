@@ -8,9 +8,6 @@ export default function Demo1() {
   const [newContainerCount, setNewContainerCount] = useState(0)
 
   useElementsMutationObserver('[data-testid="container"]', {
-    observeOptions: {
-      characterData: true,
-    },
     onMount(element) {
       console.log('🚀 ~ file: demo1.tsx:11 ~ onMount ~ element:', element)
     },
@@ -20,6 +17,8 @@ export default function Demo1() {
     onUnmount(element) {
       console.log('🚀 ~ file: demo1.tsx:18 ~ onUnmount ~ element:', element)
     },
+  }, {
+    characterData: true,
   })
 
   return (

@@ -1,9 +1,7 @@
 import { createElementMutationObserver } from '@/helpers/dom/mutation-observer'
 import { useEffect, useRef } from 'react'
 
-import type { CreateElementMutationObserverOptions } from '@/helpers/dom/mutation-observer'
-
-export interface UseElementsMutationObserverPostElementBaseOptions<E extends Element = Element> extends Pick<CreateElementMutationObserverOptions<E>, 'observeOptions'> {
+export interface UseElementsMutationObserverPostElementBaseOptions<E extends Element = Element> {
   onMount?: (element: E) => void
   onUpdate?: (element: E) => void
   onUnmount?: (element: E) => void
@@ -15,14 +13,15 @@ export interface UseElementsMutationObserverBaseOptions<
 }
 
 /** Listen for element mutations under document.documentElement */
-export function useElementsMutationObserver(selectors: string, options: UseElementsMutationObserverBaseOptions) {
+export function useElementsMutationObserver<E extends Element = Element>(selectors: string, options: UseElementsMutationObserverBaseOptions<E>, observeOptions?: MutationObserverInit) {
   const optionsRef = useRef(options)
 
   useEffect(() => {
     const disposer = createElementMutationObserver({
       element: document.documentElement,
+      observeOptions,
       onMount: () => {
-        document.querySelectorAll(selectors).forEach((element) => {
+        document.querySelectorAll<E>(selectors).forEach((element) => {
           optionsRef.current?.onMount?.(element)
         })
       },
@@ -34,14 +33,14 @@ export function useElementsMutationObserver(selectors: string, options: UseEleme
       ) => {
         mutations.forEach((record) => {
           record.addedNodes.forEach((item) => {
-            if (item instanceof HTMLElement && item.matches(selectors)) {
-              optionsRef.current?.onMount?.(item)
+            if (item instanceof Element && item.matches(selectors)) {
+              optionsRef.current?.onMount?.(item as E)
             }
           })
 
           record.removedNodes.forEach((item) => {
-            if (item instanceof HTMLElement && item.matches(selectors)) {
-              optionsRef.current?.onUnmount?.(item)
+            if (item instanceof Element && item.matches(selectors)) {
+              optionsRef.current?.onUnmount?.(item as E)
             }
           })
 
@@ -52,15 +51,15 @@ export function useElementsMutationObserver(selectors: string, options: UseEleme
           }
 
           if (record.type === 'attributes') {
-            if (record.target instanceof HTMLElement) {
+            if (record.target instanceof Element) {
               const target = record.target.closest(selectors)
               if (target) {
-                onUpdate(target)
+                onUpdate(target as E)
               }
             } else {
               const target = record.target.parentElement?.closest(selectors)
               if (target) {
-                onUpdate(target)
+                onUpdate(target as E)
               }
             }
           }
@@ -68,7 +67,7 @@ export function useElementsMutationObserver(selectors: string, options: UseEleme
           if (record.type === 'characterData') {
             const target = record.target.parentElement?.closest(selectors)
             if (target) {
-              onUpdate(target)
+              onUpdate(target as E)
             }
           }
         })
@@ -78,5 +77,5 @@ export function useElementsMutationObserver(selectors: string, options: UseEleme
     return () => {
       disposer?.()
     }
-  }, [selectors])
+  }, [selectors, observeOptions])
 }

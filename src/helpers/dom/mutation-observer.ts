@@ -7,52 +7,32 @@ export interface CreateElementMutationObserverOptions<
    *
    * {
    *   subtree: true,
-   *   childList: true,
    *   attributes: true,
    * }
    *
    * 传入的值做合并处理
    */
   observeOptions?: MutationObserverInit
-  /** 支持返回 disposer */
-  onCreate?: (element: T) => void | (() => void)
-  onMutate?: (element: T, mutations: MutationRecord[]) => void
-  /** 挂载和更新时都会调用，支持返回 disposer */
-  onEffect?: (
-    element: T,
-    mutations: MutationRecord[] | [],
-  ) => void | (() => void)
-  onUnmount?: () => void
+  onMount?: (element: T) => void
+  onUpdate?: (element: T, mutations: MutationRecord[]) => void
 }
 
 export function createElementMutationObserver<T extends Element = Element>(
   options: CreateElementMutationObserverOptions<T>,
 ) {
-  const { element, onCreate, onMutate, onEffect, onUnmount, observeOptions }
+  const { element, onMount, onUpdate, observeOptions }
     = options
 
   if (!element.isConnected) {
     return
   }
 
-  if ([onCreate, onMutate, onEffect, onUnmount].every((item) => !item)) {
+  if ([onMount, onUpdate].every((item) => !item)) {
     return
   }
 
-  const mountDisposer = onCreate?.(element)
-  const effectDisposer = onEffect?.(element, [])
-
   const callback: MutationCallback = (mutations, observer) => {
-    if (!element.isConnected) {
-      onUnmount?.()
-      effectDisposer?.()
-      mountDisposer?.()
-      observer.disconnect()
-      return
-    }
-
-    onMutate?.(element, mutations)
-    onEffect?.(element, mutations)
+    onUpdate?.(element, mutations)
   }
 
   // Create an observer instance linked to the callback function

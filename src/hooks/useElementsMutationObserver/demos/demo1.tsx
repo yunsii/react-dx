@@ -11,26 +11,36 @@ export default function Demo1() {
     observeOptions: {
       characterData: true,
     },
-    onCreate(element) {
-      console.log('🚀 ~ file: demo1.tsx:11 ~ onCreate ~ element:', element)
+    onMount(element) {
+      console.log('🚀 ~ file: demo1.tsx:11 ~ onMount ~ element:', element)
     },
-    onMutate(element, mutations) {
-      console.log('🚀 ~ file: demo1.tsx:15 ~ onMutate ~ element, mutations:', element, mutations)
+    onUpdate(element) {
+      console.log('🚀 ~ file: demo1.tsx:15 ~ onUpdate ~ element:', element)
     },
-    onEffect(element, mutations) {
-      console.log('🚀 ~ file: demo1.tsx:18 ~ onEffect ~ element, mutations:', element, mutations)
+    onUnmount(element) {
+      console.log('🚀 ~ file: demo1.tsx:18 ~ onUnmount ~ element:', element)
     },
   })
 
   return (
     <div>
       <button
+        type='button'
         className='border'
         onClick={() => {
           setNewContainerCount(newContainerCount + 1)
         }}
       >
         New container
+      </button>
+      <button
+        type='button'
+        className='border'
+        onClick={() => {
+          setNewContainerCount(newContainerCount - 1)
+        }}
+      >
+        Remove container
       </button>
       <div data-testid='container' className='flex flex-col'>
         <span>Container</span>
@@ -49,7 +59,6 @@ export default function Demo1() {
               new container
               {index + 1}
               <div>
-                {/* Un-controlled input can not trigger mutation observer */}
                 <input className='border' />
               </div>
             </div>

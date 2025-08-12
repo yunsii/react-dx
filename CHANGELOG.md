@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.0.0
+
+### Major Changes
+
+- 📦 refactor!: new useElementsMutationObserver
+
 ## 0.2.3
 
 ### Patch Changes

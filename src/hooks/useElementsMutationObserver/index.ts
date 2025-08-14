@@ -1,6 +1,51 @@
 import { createElementMutationObserver } from '@/helpers/dom/mutation-observer'
 import { useEffect, useMemo, useRef } from 'react'
 
+// 使用 WeakSet 和 WeakMap 管理元素状态，避免 DOM 污染
+// WeakSet/WeakMap 会在元素被垃圾回收时自动清理，无内存泄漏风险
+const mountedElements = new WeakSet<Element>()
+const unmountCallbackElements = new WeakSet<Element>()
+
+// 统一的元素状态管理函数
+function markElementMounted(element: Element): void {
+  mountedElements.add(element)
+}
+
+function isElementMounted(element: Element): boolean {
+  return mountedElements.has(element)
+}
+
+function markElementForUnmount(element: Element): void {
+  unmountCallbackElements.add(element)
+}
+
+function hasUnmountCallback(element: Element): boolean {
+  return unmountCallbackElements.has(element)
+}
+
+function addElementState(element: Element, hasOnMount: boolean, hasOnUnmount: boolean): void {
+  if (hasOnMount) {
+    markElementMounted(element)
+  }
+
+  if (hasOnUnmount) {
+    markElementForUnmount(element)
+  }
+}
+
+function processElements<E extends Element>(
+  elements: NodeListOf<E> | E[],
+  onMount?: (element: E) => void,
+  hasOnUnmount?: boolean,
+): void {
+  elements.forEach((element) => {
+    onMount?.(element)
+    if (hasOnUnmount) {
+      addElementState(element, true, hasOnUnmount)
+    }
+  })
+}
+
 export interface UseElementsMutationObserverPostElementBaseOptions<E extends Element = Element> {
   onMount?: (element: E) => void
   onUpdate?: (element: E) => void
@@ -28,9 +73,15 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
       element: document.documentElement,
       observeOptions: memoedObserveOptions,
       onMount: () => {
-        document.querySelectorAll<E>(selectors).forEach((element) => {
-          optionsRef.current?.onMount?.(element)
-        })
+        if (optionsRef.current?.onMount) {
+          const elements = document.querySelectorAll<E>(selectors)
+          processElements(elements, optionsRef.current.onMount, !!optionsRef.current?.onUnmount)
+        } else if (optionsRef.current?.onUnmount) {
+          // 只有 onUnmount 回调时，添加标记属性
+          document.querySelectorAll<E>(selectors).forEach((element) => {
+            markElementForUnmount(element)
+          })
+        }
       },
       onUpdate: (
         element,
@@ -40,14 +91,58 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
       ) => {
         mutations.forEach((record) => {
           record.addedNodes.forEach((item) => {
-            if (item instanceof Element && item.matches(selectors)) {
-              optionsRef.current?.onMount?.(item as E)
+            if (item instanceof Element) {
+              if (item.matches(selectors)) {
+                optionsRef.current?.onMount?.(item as E)
+                if (optionsRef.current?.onUnmount) {
+                  addElementState(item, true, true)
+                }
+                return
+              }
+              const matchedUnderItem = item.querySelectorAll<E>(selectors)
+              if (matchedUnderItem.length > 0) {
+                processElements(matchedUnderItem, optionsRef.current?.onMount, !!optionsRef.current?.onUnmount)
+                return
+              }
+              const matchedUnderDocumentElement = document.querySelectorAll(selectors)
+              matchedUnderDocumentElement.forEach((element) => {
+                if (isElementMounted(element)) {
+                  return
+                }
+                optionsRef.current?.onMount?.(element as E)
+                if (optionsRef.current?.onUnmount) {
+                  addElementState(element, true, true)
+                }
+              })
             }
           })
 
           record.removedNodes.forEach((item) => {
-            if (item instanceof Element && item.matches(selectors)) {
-              optionsRef.current?.onUnmount?.(item as E)
+            if (item instanceof Element) {
+              if (item.matches(selectors)) {
+                optionsRef.current?.onUnmount?.(item as E)
+              } else {
+                // 遍历所有子元素，检查是否在 unmountCallbackElements 中
+                const walker = document.createTreeWalker(
+                  item,
+                  NodeFilter.SHOW_ELEMENT,
+                  {
+                    acceptNode: (node) => {
+                      return hasUnmountCallback(node as Element)
+                        ? NodeFilter.FILTER_ACCEPT
+                        : NodeFilter.FILTER_SKIP
+                    },
+                  },
+                )
+
+                let currentNode = walker.nextNode()
+                while (currentNode) {
+                  if (currentNode instanceof Element && (currentNode as Element).matches(selectors)) {
+                    optionsRef.current?.onUnmount?.(currentNode as E)
+                  }
+                  currentNode = walker.nextNode()
+                }
+              }
             }
           })
 
@@ -58,6 +153,7 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
           }
 
           if (record.type === 'attributes') {
+            // 由于使用 WeakSet 管理状态，不会产生属性变化，直接处理所有属性变化
             if (record.target instanceof Element) {
               const target = record.target.closest(selectors)
               if (target) {

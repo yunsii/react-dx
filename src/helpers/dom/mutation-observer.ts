@@ -7,6 +7,7 @@ export interface CreateElementMutationObserverOptions<
    *
    * {
    *   subtree: true,
+   *   childList: true,
    *   attributes: true,
    * }
    *

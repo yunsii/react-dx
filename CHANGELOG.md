@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.0.4
+
+### Patch Changes
+
+- 🐛 fix: improve element state management with useRef
+
 ## 1.0.3
 
 ### Patch Changes

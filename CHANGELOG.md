@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.0.7
+
+### Patch Changes
+
+- 🐛 fix: onMount not been collected
+
 ## 1.0.6
 
 ### Patch Changes

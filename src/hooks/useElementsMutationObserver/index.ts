@@ -94,65 +94,80 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
         // ref: https://developer.mozilla.org/en-US/docs/Web/API/MutationRecord#instance_properties
         mutations,
       ) => {
+        // 缓存回调函数，避免重复访问
+        const currentOptions = optionsRef.current
+        const { onMount, onUnmount, onUpdate } = currentOptions || {}
+        const hasOnMount = !!onMount
+        const hasOnUnmount = !!onUnmount
+
         mutations.forEach((record) => {
-          record.addedNodes.forEach((item) => {
-            if (item instanceof Element) {
-              if (item.matches(selectors)) {
-                optionsRef.current?.onMount?.(item as E)
-                if (optionsRef.current?.onUnmount) {
-                  stateManager.addElementState(item, true, true)
-                }
-                return
-              }
-              const matchedUnderItem = item.querySelectorAll<E>(selectors)
-              if (matchedUnderItem.length > 0) {
-                stateManager.processElements(matchedUnderItem, optionsRef.current?.onMount, !!optionsRef.current?.onUnmount)
-                return
-              }
-              const matchedUnderDocumentElement = document.querySelectorAll(selectors)
-              matchedUnderDocumentElement.forEach((element) => {
-                if (stateManager.isElementMounted(element)) {
+          // 处理新增节点
+          if (hasOnMount || hasOnUnmount) {
+            record.addedNodes.forEach((item) => {
+              if (item instanceof Element) {
+                if (item.matches(selectors)) {
+                  if (hasOnMount) {
+                    onMount(item as E)
+                  }
+                  if (hasOnUnmount) {
+                    stateManager.addElementState(item, true, true)
+                  }
                   return
                 }
-                optionsRef.current?.onMount?.(element as E)
-                if (optionsRef.current?.onUnmount) {
-                  stateManager.addElementState(element, true, true)
+                const matchedUnderItem = item.querySelectorAll<E>(selectors)
+                if (matchedUnderItem.length > 0) {
+                  stateManager.processElements(matchedUnderItem, hasOnMount ? onMount : undefined, hasOnUnmount)
+                  return
                 }
-              })
-            }
-          })
-
-          record.removedNodes.forEach((item) => {
-            if (item instanceof Element) {
-              if (item.matches(selectors)) {
-                optionsRef.current?.onUnmount?.(item as E)
-              } else {
-                // 遍历所有子元素，检查是否在 unmountCallbackElements 中
-                const walker = document.createTreeWalker(
-                  item,
-                  NodeFilter.SHOW_ELEMENT,
-                  {
-                    acceptNode: (node) => {
-                      return stateManager.hasUnmountCallback(node as Element)
-                        ? NodeFilter.FILTER_ACCEPT
-                        : NodeFilter.FILTER_SKIP
-                    },
-                  },
-                )
-
-                let currentNode = walker.nextNode()
-                while (currentNode) {
-                  if (currentNode instanceof Element && (currentNode as Element).matches(selectors)) {
-                    optionsRef.current?.onUnmount?.(currentNode as E)
+                const matchedUnderDocumentElement = document.querySelectorAll(selectors)
+                matchedUnderDocumentElement.forEach((element) => {
+                  if (stateManager.isElementMounted(element)) {
+                    return
                   }
-                  currentNode = walker.nextNode()
+                  if (hasOnMount) {
+                    onMount(element as E)
+                  }
+                  if (hasOnUnmount) {
+                    stateManager.addElementState(element, true, true)
+                  }
+                })
+              }
+            })
+          }
+
+          // 处理移除节点
+          if (hasOnUnmount) {
+            record.removedNodes.forEach((item) => {
+              if (item instanceof Element) {
+                if (item.matches(selectors)) {
+                  onUnmount(item as E)
+                } else {
+                  // 遍历所有子元素，检查是否在 unmountCallbackElements 中
+                  const walker = document.createTreeWalker(
+                    item,
+                    NodeFilter.SHOW_ELEMENT,
+                    {
+                      acceptNode: (node) => {
+                        return stateManager.hasUnmountCallback(node as Element)
+                          ? NodeFilter.FILTER_ACCEPT
+                          : NodeFilter.FILTER_SKIP
+                      },
+                    },
+                  )
+
+                  let currentNode = walker.nextNode()
+                  while (currentNode) {
+                    if (currentNode instanceof Element && (currentNode as Element).matches(selectors)) {
+                      onUnmount(currentNode as E)
+                    }
+                    currentNode = walker.nextNode()
+                  }
                 }
               }
-            }
-          })
+            })
+          }
 
-          const onUpdate = optionsRef.current?.onUpdate
-
+          // 处理属性和字符数据变化
           if (!onUpdate) {
             return
           }

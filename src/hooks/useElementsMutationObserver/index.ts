@@ -1,51 +1,6 @@
 import { createElementMutationObserver } from '@/helpers/dom/mutation-observer'
 import { useEffect, useMemo, useRef } from 'react'
 
-// 使用 WeakSet 和 WeakMap 管理元素状态，避免 DOM 污染
-// WeakSet/WeakMap 会在元素被垃圾回收时自动清理，无内存泄漏风险
-const mountedElements = new WeakSet<Element>()
-const unmountCallbackElements = new WeakSet<Element>()
-
-// 统一的元素状态管理函数
-function markElementMounted(element: Element): void {
-  mountedElements.add(element)
-}
-
-function isElementMounted(element: Element): boolean {
-  return mountedElements.has(element)
-}
-
-function markElementForUnmount(element: Element): void {
-  unmountCallbackElements.add(element)
-}
-
-function hasUnmountCallback(element: Element): boolean {
-  return unmountCallbackElements.has(element)
-}
-
-function addElementState(element: Element, hasOnMount: boolean, hasOnUnmount: boolean): void {
-  if (hasOnMount) {
-    markElementMounted(element)
-  }
-
-  if (hasOnUnmount) {
-    markElementForUnmount(element)
-  }
-}
-
-function processElements<E extends Element>(
-  elements: NodeListOf<E> | E[],
-  onMount?: (element: E) => void,
-  hasOnUnmount?: boolean,
-): void {
-  elements.forEach((element) => {
-    onMount?.(element)
-    if (hasOnUnmount) {
-      addElementState(element, true, hasOnUnmount)
-    }
-  })
-}
-
 export interface UseElementsMutationObserverPostElementBaseOptions<E extends Element = Element> {
   onMount?: (element: E) => void
   onUpdate?: (element: E) => void
@@ -61,6 +16,56 @@ export interface UseElementsMutationObserverBaseOptions<
 export function useElementsMutationObserver<E extends Element = Element>(selectors: string, options: UseElementsMutationObserverBaseOptions<E>, observeOptions?: MutationObserverInit) {
   const optionsRef = useRef(options)
 
+  // 每个 hook 实例都有独立的状态管理，避免多个实例间的状态污染
+  const stateManager = useMemo(() => {
+    // 使用 WeakSet 管理元素状态，避免 DOM 污染
+    // WeakSet 会在元素被垃圾回收时自动清理，无内存泄漏风险
+    const mountedElements = new WeakSet<Element>()
+    const unmountCallbackElements = new WeakSet<Element>()
+
+    return {
+      // 统一的元素状态管理函数
+      markElementMounted(element: Element): void {
+        mountedElements.add(element)
+      },
+
+      isElementMounted(element: Element): boolean {
+        return mountedElements.has(element)
+      },
+
+      markElementForUnmount(element: Element): void {
+        unmountCallbackElements.add(element)
+      },
+
+      hasUnmountCallback(element: Element): boolean {
+        return unmountCallbackElements.has(element)
+      },
+
+      addElementState(element: Element, hasOnMount: boolean, hasOnUnmount: boolean): void {
+        if (hasOnMount) {
+          this.markElementMounted(element)
+        }
+
+        if (hasOnUnmount) {
+          this.markElementForUnmount(element)
+        }
+      },
+
+      processElements<E extends Element>(
+        elements: NodeListOf<E> | E[],
+        onMount?: (element: E) => void,
+        hasOnUnmount?: boolean,
+      ): void {
+        elements.forEach((element) => {
+          onMount?.(element)
+          if (hasOnUnmount) {
+            this.addElementState(element, true, hasOnUnmount)
+          }
+        })
+      },
+    }
+  }, [])
+
   const memoedObserveOptions = useMemo(() => {
     return {
       ...observeOptions,
@@ -75,11 +80,11 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
       onMount: () => {
         if (optionsRef.current?.onMount) {
           const elements = document.querySelectorAll<E>(selectors)
-          processElements(elements, optionsRef.current.onMount, !!optionsRef.current?.onUnmount)
+          stateManager.processElements(elements, optionsRef.current.onMount, !!optionsRef.current?.onUnmount)
         } else if (optionsRef.current?.onUnmount) {
           // 只有 onUnmount 回调时，添加标记属性
           document.querySelectorAll<E>(selectors).forEach((element) => {
-            markElementForUnmount(element)
+            stateManager.markElementForUnmount(element)
           })
         }
       },
@@ -95,23 +100,23 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
               if (item.matches(selectors)) {
                 optionsRef.current?.onMount?.(item as E)
                 if (optionsRef.current?.onUnmount) {
-                  addElementState(item, true, true)
+                  stateManager.addElementState(item, true, true)
                 }
                 return
               }
               const matchedUnderItem = item.querySelectorAll<E>(selectors)
               if (matchedUnderItem.length > 0) {
-                processElements(matchedUnderItem, optionsRef.current?.onMount, !!optionsRef.current?.onUnmount)
+                stateManager.processElements(matchedUnderItem, optionsRef.current?.onMount, !!optionsRef.current?.onUnmount)
                 return
               }
               const matchedUnderDocumentElement = document.querySelectorAll(selectors)
               matchedUnderDocumentElement.forEach((element) => {
-                if (isElementMounted(element)) {
+                if (stateManager.isElementMounted(element)) {
                   return
                 }
                 optionsRef.current?.onMount?.(element as E)
                 if (optionsRef.current?.onUnmount) {
-                  addElementState(element, true, true)
+                  stateManager.addElementState(element, true, true)
                 }
               })
             }
@@ -128,7 +133,7 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
                   NodeFilter.SHOW_ELEMENT,
                   {
                     acceptNode: (node) => {
-                      return hasUnmountCallback(node as Element)
+                      return stateManager.hasUnmountCallback(node as Element)
                         ? NodeFilter.FILTER_ACCEPT
                         : NodeFilter.FILTER_SKIP
                     },
@@ -180,5 +185,5 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
     return () => {
       disposer?.()
     }
-  }, [selectors, memoedObserveOptions])
+  }, [selectors, memoedObserveOptions, stateManager])
 }

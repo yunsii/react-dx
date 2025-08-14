@@ -41,25 +41,18 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
         return unmountCallbackElements.has(element)
       },
 
-      addElementState(element: Element, hasOnMount: boolean, hasOnUnmount: boolean): void {
-        if (hasOnMount) {
-          this.markElementMounted(element)
-        }
-
-        if (hasOnUnmount) {
-          this.markElementForUnmount(element)
-        }
-      },
-
       processElements<E extends Element>(
         elements: NodeListOf<E> | E[],
         onMount?: (element: E) => void,
         hasOnUnmount?: boolean,
       ): void {
         elements.forEach((element) => {
-          onMount?.(element)
+          if (onMount) {
+            onMount(element)
+            this.markElementMounted(element)
+          }
           if (hasOnUnmount) {
-            this.addElementState(element, true, hasOnUnmount)
+            this.markElementForUnmount(element)
           }
         })
       },
@@ -108,9 +101,10 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
                 if (item.matches(selectors)) {
                   if (hasOnMount) {
                     onMount(item as E)
+                    stateManager.markElementMounted(item)
                   }
                   if (hasOnUnmount) {
-                    stateManager.addElementState(item, true, true)
+                    stateManager.markElementForUnmount(item)
                   }
                   return
                 }
@@ -126,9 +120,10 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
                   }
                   if (hasOnMount) {
                     onMount(element as E)
+                    stateManager.markElementMounted(element)
                   }
                   if (hasOnUnmount) {
-                    stateManager.addElementState(element, true, true)
+                    stateManager.markElementForUnmount(element)
                   }
                 })
               }

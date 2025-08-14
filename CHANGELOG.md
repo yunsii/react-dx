@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.0.3
+
+### Patch Changes
+
+- 🐛 fix: improve element state management
+
 ## 1.0.2
 
 ### Patch Changes

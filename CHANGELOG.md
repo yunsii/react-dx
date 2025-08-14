@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.0.5
+
+### Patch Changes
+
+- ✨ feat: improve performance of useElementsMutationObserver
+
 ## 1.0.4
 
 ### Patch Changes

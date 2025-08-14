@@ -1,5 +1,5 @@
 import { createElementMutationObserver } from '@/helpers/dom/mutation-observer'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 export interface UseElementsMutationObserverPostElementBaseOptions<E extends Element = Element> {
   onMount?: (element: E) => void
@@ -16,10 +16,17 @@ export interface UseElementsMutationObserverBaseOptions<
 export function useElementsMutationObserver<E extends Element = Element>(selectors: string, options: UseElementsMutationObserverBaseOptions<E>, observeOptions?: MutationObserverInit) {
   const optionsRef = useRef(options)
 
+  const memoedObserveOptions = useMemo(() => {
+    return {
+      ...observeOptions,
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(observeOptions)])
+
   useEffect(() => {
     const disposer = createElementMutationObserver({
       element: document.documentElement,
-      observeOptions,
+      observeOptions: memoedObserveOptions,
       onMount: () => {
         document.querySelectorAll<E>(selectors).forEach((element) => {
           optionsRef.current?.onMount?.(element)
@@ -77,5 +84,5 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
     return () => {
       disposer?.()
     }
-  }, [selectors, observeOptions])
+  }, [selectors, memoedObserveOptions])
 }

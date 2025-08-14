@@ -36,7 +36,7 @@ export default function Demo1() {
         type='button'
         className='border'
         onClick={() => {
-          setNewContainerCount(newContainerCount - 1)
+          setNewContainerCount(Math.max(newContainerCount - 1, 0))
         }}
       >
         Remove container

@@ -27,26 +27,28 @@ export function createElementMutationObserver<T extends Element = Element>(
     return
   }
 
-  if ([onMount, onUpdate].every((item) => !item)) {
-    return
+  if (onMount) {
+    onMount(element)
   }
 
-  const callback: MutationCallback = (mutations, observer) => {
-    onUpdate?.(element, mutations)
-  }
+  if (onUpdate) {
+    const callback: MutationCallback = (mutations, observer) => {
+      onUpdate(element, mutations)
+    }
 
-  // Create an observer instance linked to the callback function
-  const observer = new MutationObserver(callback)
+    // Create an observer instance linked to the callback function
+    const observer = new MutationObserver(callback)
 
-  // Start observing the target node for configured mutations
-  observer.observe(element, {
-    subtree: true,
-    childList: true,
-    attributes: true,
-    ...observeOptions,
-  })
+    // Start observing the target node for configured mutations
+    observer.observe(element, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      ...observeOptions,
+    })
 
-  return () => {
-    observer.disconnect()
+    return () => {
+      observer.disconnect()
+    }
   }
 }

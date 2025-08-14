@@ -41,13 +41,17 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
         return unmountCallbackElements.has(element)
       },
 
+      removeUnmountCallback(element: Element): void {
+        unmountCallbackElements.delete(element)
+      },
+
       processElements<E extends Element>(
         elements: NodeListOf<E> | E[],
         onMount?: (element: E) => void,
         hasOnUnmount?: boolean,
       ): void {
         elements.forEach((element) => {
-          if (onMount) {
+          if (onMount && !this.isElementMounted(element)) {
             onMount(element)
             this.markElementMounted(element)
           }
@@ -99,7 +103,7 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
             record.addedNodes.forEach((item) => {
               if (item instanceof Element) {
                 if (item.matches(selectors)) {
-                  if (hasOnMount) {
+                  if (hasOnMount && !stateManager.isElementMounted(item)) {
                     onMount(item as E)
                     stateManager.markElementMounted(item)
                   }
@@ -136,6 +140,7 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
               if (item instanceof Element) {
                 if (item.matches(selectors)) {
                   onUnmount(item as E)
+                  stateManager.removeUnmountCallback(item)
                 } else {
                   // 遍历所有子元素，检查是否在 unmountCallbackElements 中
                   const walker = document.createTreeWalker(
@@ -154,6 +159,7 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
                   while (currentNode) {
                     if (currentNode instanceof Element && (currentNode as Element).matches(selectors)) {
                       onUnmount(currentNode as E)
+                      stateManager.removeUnmountCallback(currentNode as Element)
                     }
                     currentNode = walker.nextNode()
                   }

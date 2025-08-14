@@ -54,11 +54,13 @@ export default function Demo1() {
       <div className='flex flex-wrap gap-2'>
         {Array.from({ length: newContainerCount }).map((_, index) => {
           return (
-            <div key={index} data-testid='container' className='bg-cyan-200'>
-              new container
-              {index + 1}
-              <div>
-                <input className='border' />
+            <div key={index}>
+              <div data-testid='container' className='bg-cyan-200'>
+                new container
+                {index + 1}
+                <div>
+                  <input className='border' />
+                </div>
               </div>
             </div>
           )

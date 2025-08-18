@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.0.8
+
+### Patch Changes
+
+- 📦 refactor: new solution for element mutation observation
+
 ## 1.0.7
 
 ### Patch Changes

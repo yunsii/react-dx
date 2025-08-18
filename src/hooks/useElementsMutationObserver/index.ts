@@ -13,26 +13,18 @@ export interface UseElementsMutationObserverBaseOptions<
 }
 
 /** Listen for element mutations under document.documentElement */
-export function useElementsMutationObserver<E extends Element = Element>(selectors: string, options: UseElementsMutationObserverBaseOptions<E>, observeOptions?: MutationObserverInit) {
+export function useElementsMutationObserver<E extends Element = Element>(
+  selectors: string,
+  options: UseElementsMutationObserverBaseOptions<E>,
+  observeOptions?: MutationObserverInit,
+) {
   const optionsRef = useRef(options)
 
-  // 每个 hook 实例都有独立的状态管理，避免多个实例间的状态污染
+  // 状态管理器，只用于管理需要 onUnmount 的元素
   const stateManager = useMemo(() => {
-    // 使用 WeakSet 管理元素状态，避免 DOM 污染
-    // WeakSet 会在元素被垃圾回收时自动清理，无内存泄漏风险
-    const mountedElements = new WeakSet<Element>()
     const unmountCallbackElements = new WeakSet<Element>()
 
     return {
-      // 统一的元素状态管理函数
-      markElementMounted(element: Element): void {
-        mountedElements.add(element)
-      },
-
-      isElementMounted(element: Element): boolean {
-        return mountedElements.has(element)
-      },
-
       markElementForUnmount(element: Element): void {
         unmountCallbackElements.add(element)
       },
@@ -43,22 +35,6 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
 
       removeUnmountCallback(element: Element): void {
         unmountCallbackElements.delete(element)
-      },
-
-      processElements<E extends Element>(
-        elements: NodeListOf<E> | E[],
-        onMount?: (element: E) => void,
-        hasOnUnmount?: boolean,
-      ): void {
-        elements.forEach((element) => {
-          if (onMount && !this.isElementMounted(element)) {
-            onMount(element)
-            this.markElementMounted(element)
-          }
-          if (hasOnUnmount) {
-            this.markElementForUnmount(element)
-          }
-        })
       },
     }
   }, [])
@@ -71,135 +47,119 @@ export function useElementsMutationObserver<E extends Element = Element>(selecto
   }, [JSON.stringify(observeOptions)])
 
   useEffect(() => {
-    const disposer = createElementMutationObserver({
+    const disposers: Array<() => void> = []
+
+    // 1. 总是监听 document.documentElement 用于 onMount 和 onUnmount
+    const documentObserverDisposer = createElementMutationObserver({
       element: document.documentElement,
       observeOptions: memoedObserveOptions,
       onMount: () => {
-        if (optionsRef.current?.onMount) {
-          const elements = document.querySelectorAll<E>(selectors)
-          stateManager.processElements(elements, optionsRef.current.onMount, !!optionsRef.current?.onUnmount)
-        } else if (optionsRef.current?.onUnmount) {
-          // 只有 onUnmount 回调时，添加标记属性
-          document.querySelectorAll<E>(selectors).forEach((element) => {
-            stateManager.markElementForUnmount(element)
-          })
-        }
-      },
-      onUpdate: (
-        element,
-        // ref: https://zh.javascript.info/mutation-observer
-        // ref: https://developer.mozilla.org/en-US/docs/Web/API/MutationRecord#instance_properties
-        mutations,
-      ) => {
-        // 缓存回调函数，避免重复访问
         const currentOptions = optionsRef.current
-        const { onMount, onUnmount, onUpdate } = currentOptions || {}
-        const hasOnMount = !!onMount
-        const hasOnUnmount = !!onUnmount
+        const elements = document.querySelectorAll<E>(selectors)
 
+        elements.forEach((element) => {
+          // 触发 onMount 回调
+          if (currentOptions?.onMount) {
+            currentOptions.onMount(element)
+          }
+
+          // 如果有 onUnmount 回调，标记元素
+          if (currentOptions?.onUnmount) {
+            stateManager.markElementForUnmount(element)
+          }
+        })
+      },
+      onUpdate: (_, mutations) => {
+        const currentOptions = optionsRef.current
+
+        // 处理新增节点，触发 onMount
         mutations.forEach((record) => {
-          // 处理新增节点
-          if (hasOnMount || hasOnUnmount) {
-            record.addedNodes.forEach((item) => {
-              if (item instanceof Element) {
-                if (item.matches(selectors)) {
-                  if (hasOnMount && !stateManager.isElementMounted(item)) {
-                    onMount(item as E)
-                    stateManager.markElementMounted(item)
-                  }
-                  if (hasOnUnmount) {
-                    stateManager.markElementForUnmount(item)
-                  }
-                  return
+          if (record.type === 'childList' && record.addedNodes.length > 0) {
+            record.addedNodes.forEach((addedNode) => {
+              if (addedNode instanceof Element) {
+                const elementsToProcess: E[] = []
+
+                if (addedNode.matches(selectors)) {
+                  elementsToProcess.push(addedNode as E)
                 }
-                const matchedUnderItem = item.querySelectorAll<E>(selectors)
-                if (matchedUnderItem.length > 0) {
-                  stateManager.processElements(matchedUnderItem, hasOnMount ? onMount : undefined, hasOnUnmount)
-                  return
-                }
-                const matchedUnderDocumentElement = document.querySelectorAll(selectors)
-                matchedUnderDocumentElement.forEach((element) => {
-                  if (stateManager.isElementMounted(element)) {
-                    return
+
+                const matchedChildren = addedNode.querySelectorAll<E>(selectors)
+                elementsToProcess.push(...Array.from(matchedChildren))
+
+                elementsToProcess.forEach((element) => {
+                  // 触发 onMount 回调
+                  if (currentOptions?.onMount) {
+                    currentOptions.onMount(element)
                   }
-                  if (hasOnMount) {
-                    onMount(element as E)
-                    stateManager.markElementMounted(element)
-                  }
-                  if (hasOnUnmount) {
+
+                  // 如果有 onUnmount 回调，标记元素
+                  if (currentOptions?.onUnmount) {
                     stateManager.markElementForUnmount(element)
                   }
                 })
               }
             })
           }
+        })
 
-          // 处理移除节点
-          if (hasOnUnmount) {
-            record.removedNodes.forEach((item) => {
-              if (item instanceof Element) {
-                if (item.matches(selectors)) {
-                  onUnmount(item as E)
-                  stateManager.removeUnmountCallback(item)
+        // 处理移除节点，触发 onUnmount
+        if (!currentOptions?.onUnmount) {
+          return
+        }
+
+        mutations.forEach((record) => {
+          if (record.type === 'childList' && record.removedNodes.length > 0) {
+            record.removedNodes.forEach((removedNode) => {
+              if (removedNode instanceof Element) {
+                // 检查被移除的元素是否匹配 selectors
+                if (removedNode.matches(selectors) && stateManager.hasUnmountCallback(removedNode)) {
+                  currentOptions.onUnmount!(removedNode as E)
+                  stateManager.removeUnmountCallback(removedNode)
                 } else {
-                  // 遍历所有子元素，检查是否在 unmountCallbackElements 中
-                  const walker = document.createTreeWalker(
-                    item,
-                    NodeFilter.SHOW_ELEMENT,
-                    {
-                      acceptNode: (node) => {
-                        return stateManager.hasUnmountCallback(node as Element)
-                          ? NodeFilter.FILTER_ACCEPT
-                          : NodeFilter.FILTER_SKIP
-                      },
-                    },
-                  )
-
-                  let currentNode = walker.nextNode()
-                  while (currentNode) {
-                    if (currentNode instanceof Element && (currentNode as Element).matches(selectors)) {
-                      onUnmount(currentNode as E)
-                      stateManager.removeUnmountCallback(currentNode as Element)
+                  // 检查被移除元素的子元素
+                  const matchedChildren = removedNode.querySelectorAll<E>(selectors)
+                  matchedChildren.forEach((child) => {
+                    if (stateManager.hasUnmountCallback(child)) {
+                      currentOptions.onUnmount!(child)
+                      stateManager.removeUnmountCallback(child)
                     }
-                    currentNode = walker.nextNode()
-                  }
+                  })
                 }
               }
             })
-          }
-
-          // 处理属性和字符数据变化
-          if (!onUpdate) {
-            return
-          }
-
-          if (record.type === 'attributes') {
-            // 由于使用 WeakSet 管理状态，不会产生属性变化，直接处理所有属性变化
-            if (record.target instanceof Element) {
-              const target = record.target.closest(selectors)
-              if (target) {
-                onUpdate(target as E)
-              }
-            } else {
-              const target = record.target.parentElement?.closest(selectors)
-              if (target) {
-                onUpdate(target as E)
-              }
-            }
-          }
-
-          if (record.type === 'characterData') {
-            const target = record.target.parentElement?.closest(selectors)
-            if (target) {
-              onUpdate(target as E)
-            }
           }
         })
       },
     })
 
+    if (documentObserverDisposer) {
+      disposers.push(documentObserverDisposer)
+    }
+
+    // 2. 如果有 onUpdate 回调，为每个匹配的元素创建独立的观察器
+    if (optionsRef.current?.onUpdate) {
+      const elements = document.querySelectorAll<E>(selectors)
+
+      elements.forEach((element) => {
+        const elementObserverDisposer = createElementMutationObserver({
+          element,
+          observeOptions: memoedObserveOptions,
+          onUpdate: () => {
+            const currentOptions = optionsRef.current
+            if (currentOptions?.onUpdate) {
+              currentOptions.onUpdate(element)
+            }
+          },
+        })
+
+        if (elementObserverDisposer) {
+          disposers.push(elementObserverDisposer)
+        }
+      })
+    }
+
     return () => {
-      disposer?.()
+      disposers.forEach((dispose) => dispose())
     }
   }, [selectors, memoedObserveOptions, stateManager])
 }

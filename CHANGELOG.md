@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.0.9
+
+### Patch Changes
+
+- 🐛 fix: element onUpdate
+
 ## 1.0.8
 
 ### Patch Changes

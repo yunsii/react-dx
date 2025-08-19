@@ -1,24 +1,30 @@
 import { createElementMutationObserver } from '@/helpers/dom/mutation-observer'
 import { useEffect, useMemo, useRef } from 'react'
 
-export interface UseElementsMutationObserverPostElementBaseOptions<E extends Element = Element> {
+export interface UseElementsMutationObserverOptions<E extends Element = Element> {
   onMount?: (element: E) => void
   onUpdate?: (element: E) => void
   onUnmount?: (element: E) => void
 }
 
-export interface UseElementsMutationObserverBaseOptions<
-  E extends Element = Element,
-> extends UseElementsMutationObserverPostElementBaseOptions<E> {
-}
-
-/** Listen for element mutations under document.documentElement */
+/**
+ * Listen for element mutations under document.documentElement
+ *
+ * @param selectors - CSS selector string to match elements
+ * @param options - Callback options for element lifecycle events
+ * @param observeOptions - MutationObserver configuration options
+ */
 export function useElementsMutationObserver<E extends Element = Element>(
   selectors: string,
-  options: UseElementsMutationObserverBaseOptions<E>,
+  options: UseElementsMutationObserverOptions<E>,
   observeOptions?: MutationObserverInit,
 ) {
   const optionsRef = useRef(options)
+
+  // 每次渲染时更新 optionsRef
+  useEffect(() => {
+    optionsRef.current = options
+  }, [options])
 
   // 状态管理器，只用于管理需要 onUnmount 的元素
   const stateManager = useMemo(() => {
@@ -41,6 +47,9 @@ export function useElementsMutationObserver<E extends Element = Element>(
 
   const memoedObserveOptions = useMemo(() => {
     return {
+      subtree: true,
+      childList: true,
+      attributes: true,
       ...observeOptions,
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -49,25 +58,85 @@ export function useElementsMutationObserver<E extends Element = Element>(
   useEffect(() => {
     const disposers: Array<() => void> = []
 
+    // 为元素创建 onUpdate 观察器的辅助函数
+    const createUpdateObserverForElement = (element: E) => {
+      if (optionsRef.current?.onUpdate) {
+        const elementObserverDisposer = createElementMutationObserver({
+          element,
+          observeOptions: memoedObserveOptions,
+          onUpdate: () => {
+            const currentOptions = optionsRef.current
+            if (currentOptions?.onUpdate) {
+              currentOptions.onUpdate(element)
+            }
+          },
+        })
+
+        if (elementObserverDisposer) {
+          disposers.push(elementObserverDisposer)
+        }
+      }
+    }
+
+    // 统一处理元素的函数
+    const processElement = (element: E) => {
+      const currentOptions = optionsRef.current
+
+      try {
+        // 触发 onMount 回调
+        if (currentOptions?.onMount) {
+          currentOptions.onMount(element)
+        }
+
+        // 如果有 onUnmount 回调，标记元素
+        if (currentOptions?.onUnmount) {
+          stateManager.markElementForUnmount(element)
+        }
+
+        // 为元素创建 onUpdate 观察器
+        createUpdateObserverForElement(element)
+      } catch (error) {
+        console.error('Error processing element:', error, element)
+      }
+    }
+
+    // 处理匹配元素集合的函数
+    const processElements = (elements: E[]) => {
+      elements.forEach(processElement)
+    }
+
+    // 处理元素卸载的函数
+    const processUnmountElement = (element: Element) => {
+      const currentOptions = optionsRef.current
+      if (currentOptions?.onUnmount && stateManager.hasUnmountCallback(element)) {
+        try {
+          currentOptions.onUnmount(element as E)
+          stateManager.removeUnmountCallback(element)
+        } catch (error) {
+          console.error('Error processing unmount element:', error, element)
+        }
+      }
+    }
+
+    // 处理移除节点的函数
+    const processRemovedNode = (removedNode: Element) => {
+      // 检查被移除的元素是否匹配 selectors
+      if (removedNode.matches(selectors)) {
+        processUnmountElement(removedNode)
+      } else {
+        // 检查被移除元素的子元素
+        const matchedChildren = removedNode.querySelectorAll<E>(selectors)
+        matchedChildren.forEach(processUnmountElement)
+      }
+    }
+
     // 1. 总是监听 document.documentElement 用于 onMount 和 onUnmount
     const documentObserverDisposer = createElementMutationObserver({
       element: document.documentElement,
       observeOptions: memoedObserveOptions,
       onMount: () => {
-        const currentOptions = optionsRef.current
         const elements = document.querySelectorAll<E>(selectors)
-
-        elements.forEach((element) => {
-          // 触发 onMount 回调
-          if (currentOptions?.onMount) {
-            currentOptions.onMount(element)
-          }
-
-          // 如果有 onUnmount 回调，标记元素
-          if (currentOptions?.onUnmount) {
-            stateManager.markElementForUnmount(element)
-          }
-        })
+        processElements(Array.from(elements))
       },
       onUpdate: (_, mutations) => {
         const currentOptions = optionsRef.current
@@ -86,17 +155,7 @@ export function useElementsMutationObserver<E extends Element = Element>(
                 const matchedChildren = addedNode.querySelectorAll<E>(selectors)
                 elementsToProcess.push(...Array.from(matchedChildren))
 
-                elementsToProcess.forEach((element) => {
-                  // 触发 onMount 回调
-                  if (currentOptions?.onMount) {
-                    currentOptions.onMount(element)
-                  }
-
-                  // 如果有 onUnmount 回调，标记元素
-                  if (currentOptions?.onUnmount) {
-                    stateManager.markElementForUnmount(element)
-                  }
-                })
+                processElements(elementsToProcess)
               }
             })
           }
@@ -111,20 +170,7 @@ export function useElementsMutationObserver<E extends Element = Element>(
           if (record.type === 'childList' && record.removedNodes.length > 0) {
             record.removedNodes.forEach((removedNode) => {
               if (removedNode instanceof Element) {
-                // 检查被移除的元素是否匹配 selectors
-                if (removedNode.matches(selectors) && stateManager.hasUnmountCallback(removedNode)) {
-                  currentOptions.onUnmount!(removedNode as E)
-                  stateManager.removeUnmountCallback(removedNode)
-                } else {
-                  // 检查被移除元素的子元素
-                  const matchedChildren = removedNode.querySelectorAll<E>(selectors)
-                  matchedChildren.forEach((child) => {
-                    if (stateManager.hasUnmountCallback(child)) {
-                      currentOptions.onUnmount!(child)
-                      stateManager.removeUnmountCallback(child)
-                    }
-                  })
-                }
+                processRemovedNode(removedNode)
               }
             })
           }
@@ -134,28 +180,6 @@ export function useElementsMutationObserver<E extends Element = Element>(
 
     if (documentObserverDisposer) {
       disposers.push(documentObserverDisposer)
-    }
-
-    // 2. 如果有 onUpdate 回调，为每个匹配的元素创建独立的观察器
-    if (optionsRef.current?.onUpdate) {
-      const elements = document.querySelectorAll<E>(selectors)
-
-      elements.forEach((element) => {
-        const elementObserverDisposer = createElementMutationObserver({
-          element,
-          observeOptions: memoedObserveOptions,
-          onUpdate: () => {
-            const currentOptions = optionsRef.current
-            if (currentOptions?.onUpdate) {
-              currentOptions.onUpdate(element)
-            }
-          },
-        })
-
-        if (elementObserverDisposer) {
-          disposers.push(elementObserverDisposer)
-        }
-      })
     }
 
     return () => {

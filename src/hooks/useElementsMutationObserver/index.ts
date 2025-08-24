@@ -5,14 +5,31 @@ export interface UseElementsMutationObserverOptions<E extends Element = Element>
   onMount?: (element: E) => void
   onUpdate?: (element: E) => void
   onUnmount?: (element: E) => void
+  /**
+   * Optional root element to observe. Defaults to `document.documentElement`.
+   * When provided, the hook will observe mutations under this element and
+   * query for `selectors` within it.
+   */
+  rootElement?: Element | null
 }
 
 /**
- * Listen for element mutations under document.documentElement
+ * Observe lifecycle events for elements that match a given selector.
  *
- * @param selectors - CSS selector string to match elements
- * @param options - Callback options for element lifecycle events
- * @param observeOptions - MutationObserver configuration options
+ * This hook installs MutationObservers under a root element (defaults to
+ * `document.documentElement`) and invokes the provided callbacks when
+ * matching elements are mounted, updated, or unmounted.
+ *
+ * Behavior summary:
+ *  - Queries the root for existing matches and calls `onMount` for each.
+ *  - Listens for DOM mutations and dispatches `onMount` / `onUpdate` / `onUnmount`.
+ *  - Supports a custom root via `options.rootElement`.
+ *
+ * Implementation notes:
+ *  - It uses an internal `useRef` guard to avoid repeated setup within the same
+ *    component instance. This prevents duplicate initialization during one
+ *    mount lifecycle but does not replace a centralized or reference-counted
+ *    observer for cross-instance reuse (recommended for app-wide usage).
  */
 export function useElementsMutationObserver<E extends Element = Element>(
   selectors: string,
@@ -26,9 +43,11 @@ export function useElementsMutationObserver<E extends Element = Element>(
     optionsRef.current = options
   }, [options])
 
-  // 状态管理器，只用于管理需要 onUnmount 的元素
+  // state manager: per-hook-instance storage used to track elements that
+  // require onUnmount callbacks and to deduplicate onMount calls for this hook
   const stateManager = useMemo(() => {
     const unmountCallbackElements = new WeakSet<Element>()
+    const mountedElementsForInstance = new WeakSet<Element>()
 
     return {
       markElementForUnmount(element: Element): void {
@@ -42,8 +61,22 @@ export function useElementsMutationObserver<E extends Element = Element>(
       removeUnmountCallback(element: Element): void {
         unmountCallbackElements.delete(element)
       },
+
+      markElementMounted(element: Element): void {
+        mountedElementsForInstance.add(element)
+      },
+
+      hasMounted(element: Element): boolean {
+        return mountedElementsForInstance.has(element)
+      },
+
+      unmarkElementMounted(element: Element): void {
+        mountedElementsForInstance.delete(element)
+      },
     }
-  }, [])
+    // 仅在 selectors 变化时重置状态
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectors])
 
   const memoedObserveOptions = useMemo(() => {
     return {
@@ -54,6 +87,9 @@ export function useElementsMutationObserver<E extends Element = Element>(
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(observeOptions)])
+
+  // extract rootElement from options so it can be included as a dependency
+  const rootElementFromOptions = options?.rootElement ?? null
 
   useEffect(() => {
     const disposers: Array<() => void> = []
@@ -78,22 +114,27 @@ export function useElementsMutationObserver<E extends Element = Element>(
       }
     }
 
-    // 统一处理元素的函数
+    // process a single element: call onMount once, register unmount, and start update observer
     const processElement = (element: E) => {
       const currentOptions = optionsRef.current
 
       try {
-        // 触发 onMount 回调
+        // call onMount only once per element (per hook instance)
         if (currentOptions?.onMount) {
-          currentOptions.onMount(element)
+          if (!stateManager.hasMounted(element)) {
+            stateManager.markElementMounted(element)
+            currentOptions.onMount(element)
+          } else {
+            // intentionally no-op when already mounted in this hook
+          }
         }
 
-        // 如果有 onUnmount 回调，标记元素
+        // register element for onUnmount callbacks
         if (currentOptions?.onUnmount) {
           stateManager.markElementForUnmount(element)
         }
 
-        // 为元素创建 onUpdate 观察器
+        // create update observer for the element
         createUpdateObserverForElement(element)
       } catch (error) {
         console.error('Error processing element:', error, element)
@@ -112,6 +153,8 @@ export function useElementsMutationObserver<E extends Element = Element>(
         try {
           currentOptions.onUnmount(element as E)
           stateManager.removeUnmountCallback(element)
+          // remove mount mark so future mounts trigger onMount again
+          stateManager.unmarkElementMounted(element)
         } catch (error) {
           console.error('Error processing unmount element:', error, element)
         }
@@ -130,12 +173,14 @@ export function useElementsMutationObserver<E extends Element = Element>(
       }
     }
 
-    // 1. 总是监听 document.documentElement 用于 onMount 和 onUnmount
+    // 1. root to observe (defaults to document.documentElement)
+    const root = rootElementFromOptions ?? document.documentElement
+
     const documentObserverDisposer = createElementMutationObserver({
-      element: document.documentElement,
+      element: root,
       observeOptions: memoedObserveOptions,
       onMount: () => {
-        const elements = document.querySelectorAll<E>(selectors)
+        const elements = root.querySelectorAll<E>(selectors)
         processElements(Array.from(elements))
       },
       onUpdate: (_, mutations) => {
@@ -185,5 +230,5 @@ export function useElementsMutationObserver<E extends Element = Element>(
     return () => {
       disposers.forEach((dispose) => dispose())
     }
-  }, [selectors, memoedObserveOptions, stateManager])
+  }, [selectors, memoedObserveOptions, stateManager, rootElementFromOptions])
 }

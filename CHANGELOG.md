@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.1.1
+
+### Patch Changes
+
+- ✨ feat: support onMount disposer
+
 ## 1.1.0
 
 ### Minor Changes

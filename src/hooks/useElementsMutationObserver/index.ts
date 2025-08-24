@@ -2,7 +2,10 @@ import { createElementMutationObserver } from '@/helpers/dom/mutation-observer'
 import { useEffect, useMemo, useRef } from 'react'
 
 export interface UseElementsMutationObserverOptions<E extends Element = Element> {
-  onMount?: (element: E) => void
+  // onMount may optionally return a disposer function which will be
+  // invoked when the element is unmounted (or when the hook cleans up).
+  // Keep the return type minimal: void or a function returning void.
+  onMount?: (element: E) => void | (() => void)
   onUpdate?: (element: E) => void
   onUnmount?: (element: E) => void
   /**
@@ -49,6 +52,11 @@ export function useElementsMutationObserver<E extends Element = Element>(
     const unmountCallbackElements = new WeakSet<Element>()
     const mountedElementsForInstance = new WeakSet<Element>()
 
+    // We keep a Map for mount disposers so we can iterate and call them
+    // during the hook-level cleanup. Using a Map keeps it simple and
+    // explicit; entries are removed when their element unmounts.
+    const mountDisposers = new Map<Element, () => void>()
+
     return {
       markElementForUnmount(element: Element): void {
         unmountCallbackElements.add(element)
@@ -72,6 +80,27 @@ export function useElementsMutationObserver<E extends Element = Element>(
 
       unmarkElementMounted(element: Element): void {
         mountedElementsForInstance.delete(element)
+      },
+
+      setMountDisposer(element: Element, disposer: () => void): void {
+        mountDisposers.set(element, disposer)
+      },
+
+      getMountDisposer(element: Element): (() => void) | undefined {
+        return mountDisposers.get(element)
+      },
+
+      hasMountDisposer(element: Element): boolean {
+        return mountDisposers.has(element)
+      },
+
+      removeMountDisposer(element: Element): void {
+        mountDisposers.delete(element)
+      },
+
+      // Return all disposers currently stored. Used during hook cleanup.
+      getAllMountDisposers(): Array<() => void> {
+        return Array.from(mountDisposers.values())
       },
     }
     // 仅在 selectors 变化时重置状态
@@ -123,7 +152,13 @@ export function useElementsMutationObserver<E extends Element = Element>(
         if (currentOptions?.onMount) {
           if (!stateManager.hasMounted(element)) {
             stateManager.markElementMounted(element)
-            currentOptions.onMount(element)
+
+            const possibleDisposer = currentOptions.onMount(element)
+
+            if (typeof possibleDisposer === 'function') {
+              // store disposer for this element so it can be called on unmount
+              stateManager.setMountDisposer(element, possibleDisposer)
+            }
           } else {
             // intentionally no-op when already mounted in this hook
           }
@@ -149,14 +184,35 @@ export function useElementsMutationObserver<E extends Element = Element>(
     // 处理元素卸载的函数
     const processUnmountElement = (element: Element) => {
       const currentOptions = optionsRef.current
+      // First run any disposer returned from onMount
+      try {
+        if (stateManager.hasMountDisposer(element)) {
+          const mountDisposer = stateManager.getMountDisposer(element)
+
+          if (mountDisposer) {
+            try {
+              mountDisposer()
+            } catch (err) {
+              console.error('Error calling mount disposer for element:', err, element)
+            }
+          }
+
+          stateManager.removeMountDisposer(element)
+        }
+      } catch (err) {
+        console.error('Error handling mount disposer for element:', err, element)
+      }
+
+      // Then call explicit onUnmount callback if provided and registered
       if (currentOptions?.onUnmount && stateManager.hasUnmountCallback(element)) {
         try {
           currentOptions.onUnmount(element as E)
+        } catch (error) {
+          console.error('Error processing unmount element:', error, element)
+        } finally {
           stateManager.removeUnmountCallback(element)
           // remove mount mark so future mounts trigger onMount again
           stateManager.unmarkElementMounted(element)
-        } catch (error) {
-          console.error('Error processing unmount element:', error, element)
         }
       }
     }
@@ -229,6 +285,22 @@ export function useElementsMutationObserver<E extends Element = Element>(
 
     return () => {
       disposers.forEach((dispose) => dispose())
+
+      try {
+        // call any remaining mount disposers that weren't called via
+        // DOM removals. This ensures resources are cleaned when the hook
+        // instance unmounts.
+        const remainingDisposers = stateManager.getAllMountDisposers()
+        remainingDisposers.forEach((d) => {
+          try {
+            d()
+          } catch (err) {
+            console.error('Error calling mount disposer during cleanup:', err)
+          }
+        })
+      } catch (err) {
+        console.error('Error while cleaning up mount disposers:', err)
+      }
     }
   }, [selectors, memoedObserveOptions, stateManager, rootElementFromOptions])
 }

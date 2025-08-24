@@ -1,5 +1,11 @@
 # react-dx
 
+## 1.1.0
+
+### Minor Changes
+
+- ✨ feat: support custom root element
+
 ## 1.0.9
 
 ### Patch Changes

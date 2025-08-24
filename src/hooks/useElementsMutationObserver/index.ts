@@ -46,11 +46,8 @@ export function useElementsMutationObserver<E extends Element = Element>(
     optionsRef.current = options
   }, [options])
 
-  // state manager: per-hook-instance storage used to track elements that
-  // require onUnmount callbacks and to deduplicate onMount calls for this hook
   const stateManager = useMemo(() => {
     const unmountCallbackElements = new WeakSet<Element>()
-    const mountedElementsForInstance = new WeakSet<Element>()
 
     // We keep a Map for mount disposers so we can iterate and call them
     // during the hook-level cleanup. Using a Map keeps it simple and
@@ -68,18 +65,6 @@ export function useElementsMutationObserver<E extends Element = Element>(
 
       removeUnmountCallback(element: Element): void {
         unmountCallbackElements.delete(element)
-      },
-
-      markElementMounted(element: Element): void {
-        mountedElementsForInstance.add(element)
-      },
-
-      hasMounted(element: Element): boolean {
-        return mountedElementsForInstance.has(element)
-      },
-
-      unmarkElementMounted(element: Element): void {
-        mountedElementsForInstance.delete(element)
       },
 
       setMountDisposer(element: Element, disposer: () => void): void {
@@ -148,19 +133,13 @@ export function useElementsMutationObserver<E extends Element = Element>(
       const currentOptions = optionsRef.current
 
       try {
-        // call onMount only once per element (per hook instance)
+        // call onMount and store its disposer if provided
         if (currentOptions?.onMount) {
-          if (!stateManager.hasMounted(element)) {
-            stateManager.markElementMounted(element)
+          const possibleDisposer = currentOptions.onMount(element)
 
-            const possibleDisposer = currentOptions.onMount(element)
-
-            if (typeof possibleDisposer === 'function') {
-              // store disposer for this element so it can be called on unmount
-              stateManager.setMountDisposer(element, possibleDisposer)
-            }
-          } else {
-            // intentionally no-op when already mounted in this hook
+          if (typeof possibleDisposer === 'function') {
+            // store disposer for this element so it can be called on unmount
+            stateManager.setMountDisposer(element, possibleDisposer)
           }
         }
 
@@ -211,8 +190,6 @@ export function useElementsMutationObserver<E extends Element = Element>(
           console.error('Error processing unmount element:', error, element)
         } finally {
           stateManager.removeUnmountCallback(element)
-          // remove mount mark so future mounts trigger onMount again
-          stateManager.unmarkElementMounted(element)
         }
       }
     }
